@@ -184,6 +184,16 @@ Set-Alias -Name vim -Value $EDITOR
 
 function .. { Set-Location .. }
 
+Set-Alias c Clear-Host
+
+Set-Alias cl Clear-Host
+
+Remove-Item -Force Alias:cat
+
+Set-Alias cat bat
+
+Set-Alias sass-convert sass
+
 function docs { 
     $docs = if (([Environment]::GetFolderPath("MyDocuments"))) { ([Environment]::GetFolderPath("MyDocuments")) } else { $HOME + "\Documents" }
     Set-Location -Path $docs
@@ -279,7 +289,7 @@ function pst { Get-Clipboard }
 
 
 #region System Utilities
-Set-Alias -Name sudo -Value admin
+Set-Alias sudo admin
 
 function admin {
     if ($args.Count -gt 0) {
