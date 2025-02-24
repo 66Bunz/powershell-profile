@@ -57,15 +57,12 @@ $PSReadLineOptions = @{
         Error     = '#FF6347'  # Tomato (keeping it close to red for visibility)
         Selection = '#e829f7'  # Black
     }
-    PredictionViewStyle           = 'ListView'
     BellStyle                     = 'None'
 }
 
 if ($PSVersionTable.PSVersion.Major -ge 7) {
     Set-PSReadLineOption -PredictionSource HistoryAndPlugin
-}
-else {
-    Set-PSReadLineOption -PredictionSource History
+    Set-PSReadLineOption -PredictionVewStyle ListView
 }
 Set-PSReadLineOption @PSReadLineOptions
 
