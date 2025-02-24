@@ -21,7 +21,9 @@ else { 'notepad' }
 
 $global:canConnectToGitHub = $null -ne (ping github.com -n 1 -w 1000 | Select-String "Reply from")
 
-Install-Module -Name PSReadLine -Scope CurrentUser -Force
+if (-not ((Get-Module -Name PSReadLine | Select-Object -ExpandProperty Version) -eq [Version] "2.3.6")) {
+    Install-Module -Name PSReadLine -Scope CurrentUser -Force
+}
 if (-not (Get-Module -ListAvailable -Name Terminal-Icons)) {
     Install-Module -Name Terminal-Icons -Scope CurrentUser -Force -SkipPublisherCheck
 }
