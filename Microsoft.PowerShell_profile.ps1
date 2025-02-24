@@ -222,7 +222,7 @@ function head {
     Get-Content $Path -Head $n
 }
 
-function home { Set-Location "D:\alebu\Documents" }
+function home { Set-Location "D:\users\bunz\Documents" }
 
 function la { Get-ChildItem -Path . -Force | Format-Table -AutoSize }
 
@@ -289,7 +289,7 @@ function pst { Get-Clipboard }
 
 
 #region System Utilities
-Set-Alias sudo admin
+# Set-Alias sudo admin
 
 function admin {
     if ($args.Count -gt 0) {
@@ -421,20 +421,58 @@ function which($name) {
 
 
 
+#region Python
+function py-env {
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("create", "activate", "deactivate", "delete")]
+        [string]$Command
+    )
+
+    switch ($Command) {
+        "create" {
+            Write-Host "Creating Python virtual environment..." -ForegroundColor Yellow
+            python -m venv .venv
+            Write-Host "Virtual environment created successfully!" -ForegroundColor Green
+        }
+        "activate" {
+            if (Test-Path ".\.venv\Scripts\Activate") {
+                Write-Host "Activating Python virtual environment..." -ForegroundColor Green
+                & .\.venv\Scripts\Activate
+            } else {
+                Write-Host "Error: Virtual environment not found. Run 'py-env create' first." -ForegroundColor Red
+            }
+        }
+        "deactivate" {
+            Write-Host "Deactivating Python virtual environment..." -ForegroundColor Red
+            deactivate
+        }
+        "delete" {
+            if (Test-Path ".\.venv") {
+                Write-Host "Deleting Python virtual environment..." -ForegroundColor Yellow
+                Remove-Item -Recurse -Force .\.venv
+                Write-Host "Virtual environment deleted successfully!" -ForegroundColor Green
+            } else {
+                Write-Host "No virtual environment found to delete." -ForegroundColor Red
+            }
+        }
+    }
+}
+#endregion Python
+
+
 
 #region Other Utilities
 Set-Alias ch Show-Help
 
 Set-Alias t transparency
 
-function activate { .\.venv\Scripts\activate }
-
-$ssh_private_key = "D:\alebu\Documents\Alessandro\Varie\ssh\bunz-laptop-private-ssh"
+$ssh_private_key = "D:\users\bunz\Documents\Alessandro\Varie\ssh\bunz-laptop-private-ssh"
 function botssh { ssh root@134.209.119.212 -i $ssh_private_key }
 
 function cam { microsoft.windows.camera: }
 
-function Nvim-Config { nvim "C:\Users\alebu\AppData\Local\nvim" }
+function Nvim-Config { nvim "C:\Users\bunz\AppData\Local\nvim" }
 
 function Show-Help {
     $helpText = @"
@@ -490,8 +528,10 @@ System Utilities:
   $($PSStyle.Foreground.Green)uptime$($PSStyle.Reset) - Displays the system uptime.
   $($PSStyle.Foreground.Green)which$($PSStyle.Reset) <name> - Shows the path of the command.
 
+Python Utilities:
+    $($PSStyle.Foreground.Green)py-env$($PSStyle.Reset) <command> - Manages Python virtual environments.
+
 Other Utilities:
-  $($PSStyle.Foreground.Green)activate$($PSStyle.Reset) - Activates the Python virtual environment.
   $($PSStyle.Foreground.Green)botssh$($PSStyle.Reset) - Connects to the DigitalOcean droplet via SSH.
   $($PSStyle.Foreground.Green)cam$($PSStyle.Reset) - Opens the camera.
   $($PSStyle.Foreground.Green)Nvim-Config$($PSStyle.Reset) - Opens the Neovim configuration directory.
