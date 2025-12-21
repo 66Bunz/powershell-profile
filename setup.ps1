@@ -7,7 +7,7 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 # Function to test internet connectivity
 function Test-InternetConnection {
     try {
-        $testConnection = Test-Connection -ComputerName www.google.com -Count 1 -ErrorAction Stop
+        Test-Connection -ComputerName www.google.com -Count 1 -ErrorAction Stop | Out-Null
         return $true
     }
     catch {
@@ -49,8 +49,7 @@ function Install-NerdFonts {
 
             Remove-Item -Path $extractPath -Recurse -Force
             Remove-Item -Path $zipFilePath -Force
-        }
-        else {
+        } else {
             Write-Host "Font ${FontDisplayName} already installed"
         }
     }
@@ -70,10 +69,10 @@ if (!(Test-Path -Path $PROFILE -PathType Leaf)) {
         # Detect Version of PowerShell & Create Profile directories if they do not exist.
         $profilePath = ""
         if ($PSVersionTable.PSEdition -eq "Core") {
-            $profilePath = if (([Environment]::GetFolderPath("MyDocuments"))) { ([Environment]::GetFolderPath("MyDocuments") + "\Powershell") } else { "$env:userprofile\Documents\Powershell" }
+            $profilePath = "$env:userprofile\Documents\Powershell"
         }
         elseif ($PSVersionTable.PSEdition -eq "Desktop") {
-            $profilePath = if (([Environment]::GetFolderPath("MyDocuments"))) { ([Environment]::GetFolderPath("MyDocuments") + "\WindowsPowerShell") } else { "$env:userprofile\Documents\WindowsPowerShell" }
+            $profilePath = "$env:userprofile\Documents\WindowsPowerShell"
         }
 
         if (!(Test-Path -Path $profilePath)) {
@@ -90,13 +89,15 @@ if (!(Test-Path -Path $PROFILE -PathType Leaf)) {
 }
 else {
     try {
-        Get-Item -Path $PROFILE | Move-Item -Destination "oldprofile.ps1" -Force
-        Invoke-RestMethod https://github.com/66Bunz/powershell-profile/raw/main/Microsoft.PowerShell_profile.ps1 -OutFile $PROFILE
-        Write-Host "The profile @ [$PROFILE] has been created and old profile removed."
-        Write-Host "Please back up any persistent components of your old profile to [$HOME\Documents\PowerShell\Profile.ps1] as there is an updater in the installed profile which uses the hash to update the profile and will lead to loss of changes"
+        $backupPath = Join-Path (Split-Path $PROFILE) "oldprofile.ps1"
+        Move-Item -Path $PROFILE -Destination $backupPath -Force
+        Invoke-RestMethod https://github.com/ChrisTitusTech/powershell-profile/raw/main/Microsoft.PowerShell_profile.ps1 -OutFile $PROFILE
+        Write-Host "✅ PowerShell profile at [$PROFILE] has been updated."
+        Write-Host "📦 Your old profile has been backed up to [$backupPath]"
+        Write-Host "⚠️ NOTE: Please back up any persistent components of your old profile to [$HOME\Documents\PowerShell\Profile.ps1] as there is an updater in the installed profile which uses the hash to update the profile and will lead to loss of changes"
     }
     catch {
-        Write-Error "Failed to backup and update the profile. Error: $_"
+        Write-Error "❌ Failed to backup and update the profile. Error: $_"
     }
 }
 
@@ -130,14 +131,13 @@ Install-NerdFonts -FontName "CascadiaCode" -FontDisplayName "CaskaydiaCove NF"
 # Final check and message to the user
 if ((Test-Path -Path $PROFILE) -and (winget list --name "OhMyPosh" -e) -and ($fontFamilies -contains "CaskaydiaCove NF")) {
     Write-Host "Setup completed successfully. Please restart your PowerShell session to apply changes."
-}
-else {
+} else {
     Write-Warning "Setup completed with errors. Please check the error messages above."
 }
 
 # Choco install
 try {
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 }
 catch {
     Write-Error "Failed to install Chocolatey. Error: $_"

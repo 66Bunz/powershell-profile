@@ -1,5 +1,72 @@
+### PowerShell Profile Refactor
+### Version 1.03 - Refactored
+
+$debug = $false
+
+# Define the update interval in days, set to -1 to always check
+$updateInterval = 7
+
+if ($debug_Override){
+    # If variable debug_Override is defined in profile.ps1 file
+    # then use it instead
+    $debug = $debug_Override
+} else {
+    $debug = $false
+}
+
+# Define the path to the file that stores the last execution time
+if ($repo_root_Override){
+    # If variable $repo_root_Override is defined in profile.ps1 file
+    # then use it instead
+    $repo_root = $repo_root_Override
+} else {
+    $repo_root = "https://raw.githubusercontent.com/66Bunz"
+}
+
+# Define the path to the file that stores the last execution time
+if ($timeFilePath_Override){
+    # If variable $timeFilePath_Override is defined in profile.ps1 file
+    # then use it instead
+    $timeFilePath = $timeFilePath_Override
+} else {
+    $timeFilePath = ([Environment]::GetFolderPath("MyDocuments")) + "\PowerShell\LastExecutionTime.txt"
+}
+
+# Define the update interval in days, set to -1 to always check
+if ($updateInterval_Override){
+    # If variable $updateInterval_Override is defined in profile.ps1 file
+    # then use it instead
+    $updateInterval = $updateInterval_Override
+} else {
+    $updateInterval = 7
+}
+
+function Debug-Message{
+    # If function "Debug-Message_Override" is defined in profile.ps1 file
+    # then call it instead.
+    if (Get-Command -Name "Debug-Message_Override" -ErrorAction SilentlyContinue) {
+        Debug-Message_Override
+    } else {
+        Write-Host "#######################################" -ForegroundColor Red
+        Write-Host "#           Debug mode enabled        #" -ForegroundColor Red
+        Write-Host "#          ONLY FOR DEVELOPMENT       #" -ForegroundColor Red
+        Write-Host "#                                     #" -ForegroundColor Red
+        Write-Host "#       IF YOU ARE NOT DEVELOPING     #" -ForegroundColor Red
+        Write-Host "#       JUST RUN \`Update-Profile\`     #" -ForegroundColor Red
+        Write-Host "#        to discard all changes       #" -ForegroundColor Red
+        Write-Host "#   and update to the latest profile  #" -ForegroundColor Red
+        Write-Host "#               version               #" -ForegroundColor Red
+        Write-Host "#######################################" -ForegroundColor Red
+    }
+}
+
+if ($debug) {
+    Debug-Message
+}
+
 #region Configuration
 
+#opt-out of telemetry before doing anything, only if PowerShell is run as admin
 if ([bool]([System.Security.Principal.WindowsIdentity]::GetCurrent()).IsSystem) {
     [System.Environment]::SetEnvironmentVariable('POWERSHELL_TELEMETRY_OPTOUT', 'true', [System.EnvironmentVariableTarget]::Machine)
 }
@@ -10,18 +77,25 @@ function Test-CommandExists {
     return $exists
 }
 
-$EDITOR = if (Test-CommandExists nvim) { 'nvim' }
-elseif (Test-CommandExists pvim) { 'pvim' }
-elseif (Test-CommandExists vim) { 'vim' }
-elseif (Test-CommandExists vi) { 'vi' }
-elseif (Test-CommandExists code) { 'code' }
-elseif (Test-CommandExists notepad++) { 'notepad++' }
-elseif (Test-CommandExists sublime_text) { 'sublime_text' }
-else { 'notepad' }
+if ($EDITOR_Override){
+    $EDITOR = $EDITOR_Override
+} else {
+    $EDITOR = if (Test-CommandExists code) { 'code' }
+          elseif (Test-CommandExists nvim) { 'nvim' }
+          elseif (Test-CommandExists pvim) { 'pvim' }
+          elseif (Test-CommandExists vim) { 'vim' }
+          elseif (Test-CommandExists vi) { 'vi' }
+          elseif (Test-CommandExists codium) { 'codium' }
+          elseif (Test-CommandExists notepad++) { 'notepad++' }
+          elseif (Test-CommandExists sublime_text) { 'sublime_text' }
+          else { 'notepad' }
+}
 
-$global:canConnectToGitHub = $null -ne (ping github.com -n 1 -w 1000 | Select-String "Reply from")
 
-if (-not ((Get-Module -Name PSReadLine | Select-Object -ExpandProperty Version) -eq [Version] "2.3.6")) {
+# Initial GitHub.com connectivity check with 1 second timeout
+$global:canConnectToGitHub = Test-Connection github.com -Count 1 -Quiet -TimeoutSeconds 1
+
+if (-not ((Get-Module -Name PSReadLine | Select-Object -ExpandProperty Version) -eq [Version] "2.4.5")) {
     Install-Module -Name PSReadLine -Scope CurrentUser -Force
 }
 if (-not (Get-Module -ListAvailable -Name Terminal-Icons)) {
@@ -38,7 +112,7 @@ function prompt {
     if ($isAdmin) { "[" + (Get-Location) + "] # " } else { "[" + (Get-Location) + "] $ " }
 }
 $adminSuffix = if ($isAdmin) { " [ADMIN]" } else { "" }
-$Host.UI.RawUI.WindowTitle = "PowerShell ({0})$adminSuffix" -f $PSVersionTable.PSVersion.Major
+$Host.UI.RawUI.WindowTitle = "PowerShell {0}$adminSuffix" -f $PSVersionTable.PSVersion.ToString()
 
 
 #region PSReadLine Configuration
@@ -58,7 +132,7 @@ $PSReadLineOptions = @{
         Comment   = '#D3D3D3'  # LightGray (pastel)
         Keyword   = '#8367c7'  # Violet (pastel)
         Error     = '#FF6347'  # Tomato (keeping it close to red for visibility)
-        Selection = '#e829f7'  # Black
+        Selection = '#e829f7'  # Magenta
     }
     PredictionViewStyle           = 'ListView'
     BellStyle                     = 'None'
@@ -97,8 +171,8 @@ Set-PSReadLineOption -MaximumHistoryCount 10000
 $scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
     $customCompletions = @{
-        'git'  = @('status', 'add', 'commit', 'push', 'pull', 'clone', 'checkout')
-        'npm'  = @('install', 'start', 'run', 'test', 'build')
+        'git' = @('status', 'add', 'commit', 'push', 'pull', 'clone', 'checkout')
+        'npm' = @('install', 'start', 'run', 'test', 'build')
         'deno' = @('run', 'compile', 'bundle', 'test', 'lint', 'fmt', 'cache', 'info', 'doc', 'upgrade')
     }
     
@@ -110,20 +184,28 @@ $scriptblock = {
     }
 }
 Register-ArgumentCompleter -Native -CommandName git, npm, deno -ScriptBlock $scriptblock
+
+$scriptblock = {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    dotnet complete --position $cursorPosition $commandAst.ToString() |
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+}
+Register-ArgumentCompleter -Native -CommandName dotnet -ScriptBlock $scriptblock
+
 #endregion PSReadLine Configuration
 
 #region Zoxide Configuration
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
-    Invoke-Expression (& { (zoxide init --cmd cd powershell | Out-String) })
-}
-else {
+    Invoke-Expression (& { (zoxide init --cmd z powershell | Out-String) })
+} else {
     Write-Host "zoxide command not found. Attempting to install via winget..."
     try {
         winget install -e --id ajeetdsouza.zoxide
         Write-Host "zoxide installed successfully. Initializing..."
-        Invoke-Expression (& { (zoxide init powershell | Out-String) })
-    }
-    catch {
+        Invoke-Expression (& { (zoxide init --cmd z powershell | Out-String) })
+    } catch {
         Write-Error "Failed to install zoxide. Error: $_"
     }
 }
@@ -149,7 +231,7 @@ function Edit-Profile($editor = $EDITOR) {
     }
 }
 
-function ep { vim $PROFILE }
+function ep { Edit-Profile }
 
 function Reload-Profile {
     & $PROFILE
@@ -157,29 +239,47 @@ function Reload-Profile {
 
 # Check for Profile Updates
 function Update-Profile {
-    try {
-        $url = "https://raw.githubusercontent.com/66Bunz/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
-        $oldhash = Get-FileHash $PROFILE
-        Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
-        $newhash = Get-FileHash "$env:temp/Microsoft.PowerShell_profile.ps1"
-        if ($newhash.Hash -ne $oldhash.Hash) {
-            Copy-Item -Path "$env:temp/Microsoft.PowerShell_profile.ps1" -Destination $PROFILE -Force
-            Write-Host "Profile has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+    Write-Host "Checking for profile updates..." -ForegroundColor Cyan
+    # If function "Update-Profile_Override" is defined in profile.ps1 file
+    # then call it instead.
+    if (Get-Command -Name "Update-Profile_Override" -ErrorAction SilentlyContinue) {
+        Update-Profile_Override;
+    } else {
+        try {
+            $url = "$repo_root/powershell-profile/main/Microsoft.PowerShell_profile.ps1"
+            $oldhash = Get-FileHash $PROFILE
+            Invoke-RestMethod $url -OutFile "$env:temp/Microsoft.PowerShell_profile.ps1"
+            $newhash = Get-FileHash "$env:temp/Microsoft.PowerShell_profile.ps1"
+            if ($newhash.Hash -ne $oldhash.Hash) {
+                Copy-Item -Path "$env:temp/Microsoft.PowerShell_profile.ps1" -Destination $PROFILE -Force
+                Write-Host "Profile has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+            } else {
+                Write-Host "Profile is up to date." -ForegroundColor Green
+            }
+        } catch {
+            Write-Error "Unable to check for `$profile updates: $_"
+        } finally {
+            Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
         }
-        else {
-            Write-Host "Profile is up to date." -ForegroundColor Green
-        }
-    }
-    catch {
-        Write-Error "Unable to check for `$profile updates: $_"
-    }
-    finally {
-        Remove-Item "$env:temp/Microsoft.PowerShell_profile.ps1" -ErrorAction SilentlyContinue
     }
 }
+
 #endregion Profile Managemenet
 
 
+# Check if not in debug mode AND (updateInterval is -1 OR file doesn't exist OR time difference is greater than the update interval)
+if (-not $debug -and `
+    ($updateInterval -eq -1 -or `
+      -not (Test-Path $timeFilePath) -or `
+      ((Get-Date) - [datetime]::ParseExact((Get-Content -Path $timeFilePath), 'yyyy-MM-dd', $null)).TotalDays -gt $updateInterval)) {
+
+    Update-Profile
+    $currentTime = Get-Date -Format 'yyyy-MM-dd'
+    $currentTime | Out-File -FilePath $timeFilePath
+
+} elseif ($debug) {
+    Write-Warning "Skipping profile update check in debug mode"
+}
 
 
 #region General Commands
@@ -191,23 +291,28 @@ Set-Alias c Clear-Host
 
 Set-Alias cl Clear-Host
 
-Remove-Item -Force Alias:cat
+Remove-Item -Force Alias:cat -ErrorAction SilentlyContinue
 
 Set-Alias cat bat
 
 Set-Alias sass-convert sass
 
 function docs { 
-    $docs = if (([Environment]::GetFolderPath("MyDocuments"))) { ([Environment]::GetFolderPath("MyDocuments")) } else { $HOME + "\Documents" }
+    $docs = if(([Environment]::GetFolderPath("MyDocuments"))) {([Environment]::GetFolderPath("MyDocuments"))} else {$HOME + "\Documents"}
     Set-Location -Path $docs
 }
 
+function dtop { 
+    $dtop = if ([Environment]::GetFolderPath("Desktop")) {[Environment]::GetFolderPath("Desktop")} else {$HOME + "\Documents"}
+    Set-Location -Path $dtop
+}
+
 function export($name, $value) {
-    set-item -force -path "env:$name" -value $value;
+    Set-Item -Force -Path "env:$name" -Value $value;
 }
 
 function ff($name) {
-    Get-ChildItem -recurse -filter "*${name}*" -ErrorAction SilentlyContinue | ForEach-Object {
+    Get-ChildItem -Recurse -Filter "*${name}*" -ErrorAction SilentlyContinue | ForEach-Object {
         Write-Output "$($_.FullName)"
     }
 }
@@ -227,7 +332,9 @@ function head {
 
 function home { Set-Location "D:\users\bunz\Documents" }
 
-function la { Get-ChildItem -Path . -Force | Format-Table -AutoSize }
+function la { Get-ChildItem | Format-Table -AutoSize }
+
+function ll { Get-ChildItem -Force | Format-Table -AutoSize }
 
 function mkcd { param($dir) mkdir $dir -Force; Set-Location $dir }
 
@@ -243,6 +350,34 @@ function tail {
 }
 
 function touch($file) { "" | Out-File $file -Encoding ASCII }
+
+function trash($path) {
+    $fullPath = (Resolve-Path -Path $path).Path
+
+    if (Test-Path $fullPath) {
+        $item = Get-Item $fullPath
+
+        if ($item.PSIsContainer) {
+          # Handle directory
+            $parentPath = $item.Parent.FullName
+        } else {
+            # Handle file
+            $parentPath = $item.DirectoryName
+        }
+
+        $shell = New-Object -ComObject 'Shell.Application'
+        $shellItem = $shell.NameSpace($parentPath).ParseName($item.Name)
+
+        if ($item) {
+            $shellItem.InvokeVerb('delete')
+            Write-Host "Item '$fullPath' has been moved to the Recycle Bin."
+        } else {
+            Write-Host "Error: Could not find the item '$fullPath' to trash."
+        }
+    } else {
+        Write-Host "Error: Item '$fullPath' does not exist."
+    }
+}
 
 function unzip ($file) {
     Write-Output("Extracting", $file, "to", $pwd)
@@ -262,7 +397,9 @@ function ga { git add . }
 
 function gc { param($m) git commit -m "$m" }
 
-function gp { git push }
+function gpull { git pull }
+
+function gpush { git push }
 
 function g { __zoxide_z github }
 
@@ -272,6 +409,7 @@ function gcom {
     git add .
     git commit -m "$args"
 }
+
 function lazyg {
     git add .
     git commit -m "$args"
@@ -296,35 +434,44 @@ function pst { Get-Clipboard }
 
 function admin {
     if ($args.Count -gt 0) {
-        $argList = "& '$args'"
+        $argList = $args -join ' '
         Start-Process wt -Verb runAs -ArgumentList "pwsh.exe -NoExit -Command $argList"
-    }
-    else {
+    } else {
         Start-Process wt -Verb runAs
     }
 }
 
 function Clear-Cache {
-    # add clear cache logic here
-    Write-Host "Clearing cache..." -ForegroundColor Cyan
+    # If function "Clear-Cache_Override" is defined in profile.ps1 file
+    # then call it instead.
+    # -----------------------------------------------------------------
+    # If you do override this function, you should should probably duplicate
+    # the following calls in your override function, just don't call this
+    # function from your override function, otherwise you'll be in an infinate loop.
+    if (Get-Command -Name "Clear-Cache_Override" -ErrorAction SilentlyContinue) {
+        Clear-Cache_Override
+    } else {
+        # add clear cache logic here
+        Write-Host "Clearing cache..." -ForegroundColor Cyan
 
-    # Clear Windows Prefetch
-    Write-Host "Clearing Windows Prefetch..." -ForegroundColor Yellow
-    Remove-Item -Path "$env:SystemRoot\Prefetch\*" -Force -ErrorAction SilentlyContinue
+        # Clear Windows Prefetch
+        Write-Host "Clearing Windows Prefetch..." -ForegroundColor Yellow
+        Remove-Item -Path "$env:SystemRoot\Prefetch\*" -Force -ErrorAction SilentlyContinue
 
-    # Clear Windows Temp
-    Write-Host "Clearing Windows Temp..." -ForegroundColor Yellow
-    Remove-Item -Path "$env:SystemRoot\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
+        # Clear Windows Temp
+        Write-Host "Clearing Windows Temp..." -ForegroundColor Yellow
+        Remove-Item -Path "$env:SystemRoot\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-    # Clear User Temp
-    Write-Host "Clearing User Temp..." -ForegroundColor Yellow
-    Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
+        # Clear User Temp
+        Write-Host "Clearing User Temp..." -ForegroundColor Yellow
+        Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-    # Clear Internet Explorer Cache
-    Write-Host "Clearing Internet Explorer Cache..." -ForegroundColor Yellow
-    Remove-Item -Path "$env:LOCALAPPDATA\Microsoft\Windows\INetCache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        # Clear Internet Explorer Cache
+        Write-Host "Clearing Internet Explorer Cache..." -ForegroundColor Yellow
+        Remove-Item -Path "$env:LOCALAPPDATA\Microsoft\Windows\INetCache\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-    Write-Host "Cache clearing completed." -ForegroundColor Green
+        Write-Host "Cache clearing completed." -ForegroundColor Green
+    }
 }
 
 function df {
@@ -353,28 +500,32 @@ function reboot { shutdown /r /t 0 }
 function sysinfo { Get-ComputerInfo }
 
 function Update-PowerShell {
-    try {
-        Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
-        $updateNeeded = $false
-        $currentVersion = $PSVersionTable.PSVersion.ToString()
-        $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
-        $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl
-        $latestVersion = $latestReleaseInfo.tag_name.Trim('v')
-        if ($currentVersion -lt $latestVersion) {
-            $updateNeeded = $true
-        }
+    # If function "Update-PowerShell_Override" is defined in profile.ps1 file
+    # then call it instead.
+    if (Get-Command -Name "Update-PowerShell_Override" -ErrorAction SilentlyContinue) {
+        Update-PowerShell_Override;
+    } else {
+        try {
+            Write-Host "Checking for PowerShell updates..." -ForegroundColor Cyan
+            $updateNeeded = $false
+            $currentVersion = $PSVersionTable.PSVersion.ToString()
+            $gitHubApiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
+            $latestReleaseInfo = Invoke-RestMethod -Uri $gitHubApiUrl
+            $latestVersion = $latestReleaseInfo.tag_name.Trim('v')
+            if ($currentVersion -lt $latestVersion) {
+                $updateNeeded = $true
+            }
 
-        if ($updateNeeded) {
-            Write-Host "Updating PowerShell..." -ForegroundColor Yellow
-            winget upgrade "Microsoft.PowerShell" --accept-source-agreements --accept-package-agreements
-            Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+            if ($updateNeeded) {
+                Write-Host "Updating PowerShell..." -ForegroundColor Yellow
+                Start-Process powershell.exe -ArgumentList "-NoProfile -Command winget upgrade Microsoft.PowerShell --accept-source-agreements --accept-package-agreements" -Wait -NoNewWindow
+                Write-Host "PowerShell has been updated. Please restart your shell to reflect changes" -ForegroundColor Magenta
+            } else {
+                Write-Host "Your PowerShell is up to date." -ForegroundColor Green
+            }
+        } catch {
+            Write-Error "Failed to update PowerShell. Error: $_"
         }
-        else {
-            Write-Host "Your PowerShell is up to date." -ForegroundColor Green
-        }
-    }
-    catch {
-        Write-Error "Failed to update PowerShell. Error: $_"
     }
 }
 
@@ -493,16 +644,19 @@ Profile Management:
 General Commands:
   $($PSStyle.Foreground.Green)..$($PSStyle.Reset) - Changes to the parent directory.
   $($PSStyle.Foreground.Green)docs$($PSStyle.Reset) - Changes the current directory to the user's Documents folder.
+  $($PSStyle.Foreground.Green)dtop$($PSStyle.Reset) - Changes the current directory to the user's Desktop folder.
   $($PSStyle.Foreground.Green)export$($PSStyle.Reset) <name> <value> - Sets an environment variable.
   $($PSStyle.Foreground.Green)ff$($PSStyle.Reset) <name> - Finds files recursively with the specified name.
   $($PSStyle.Foreground.Green)grep$($PSStyle.Reset) <regex> [dir] - Searches for a regex pattern in files within the specified directory or from the pipeline input.
   $($PSStyle.Foreground.Green)head$($PSStyle.Reset) <path> [n] - Displays the first n lines of a file (default 10).
-  $($PSStyle.Foreground.Green)la$($PSStyle.Reset) - Lists all files in the current directory with detailed formatting.
+  $($PSStyle.Foreground.Green)la$($PSStyle.Reset) - Lists non hidden files in the current directory with detailed formatting.
+  $($PSStyle.Foreground.Green)ll$($PSStyle.Reset) - Lists all files in the current directory with detailed formatting.
   $($PSStyle.Foreground.Green)mkcd$($PSStyle.Reset) <dir> - Creates and changes to a new directory.
   $($PSStyle.Foreground.Green)nf$($PSStyle.Reset) <name> - Creates a new file with the specified name.
   $($PSStyle.Foreground.Green)sed$($PSStyle.Reset) <file> <find> <replace> - Replaces text in a file.
   $($PSStyle.Foreground.Green)tail$($PSStyle.Reset) <path> [n] - Displays the last n lines of a file (default 10).
   $($PSStyle.Foreground.Green)touch$($PSStyle.Reset) <file> - Creates a new empty file.
+  $($PSStyle.Foreground.Green)trash$($PSStyle.Reset) <file> - Moves a file to the recycle bin.
   $($PSStyle.Foreground.Green)unzip$($PSStyle.Reset) <file> - Extracts a zip file to the current directory.
   
 Git Shortcuts:
@@ -510,7 +664,8 @@ Git Shortcuts:
   $($PSStyle.Foreground.Green)ga$($PSStyle.Reset) - Shortcut for 'git add .'.
   $($PSStyle.Foreground.Green)gc$($PSStyle.Reset) <message> - Shortcut for 'git commit -m'.
   $($PSStyle.Foreground.Green)gcom$($PSStyle.Reset) <message> - Adds all changes and commits with the specified message.
-  $($PSStyle.Foreground.Green)gp$($PSStyle.Reset) - Shortcut for 'git push'.
+  $($PSStyle.Foreground.Green)gpull$($PSStyle.Reset) - Shortcut for 'git pull'.
+  $($PSStyle.Foreground.Green)gpush$($PSStyle.Reset) - Shortcut for 'git push'.
   $($PSStyle.Foreground.Green)gs$($PSStyle.Reset) - Shortcut for 'git status'.
   $($PSStyle.Foreground.Green)lazyg$($PSStyle.Reset) <message> - Adds all changes, commits with the specified message, and pushes to the remote repository.
 
@@ -578,7 +733,7 @@ function transparency {
 }
 
 function winutil {
-    Invoke-WebRequest -useb https://christitus.com/win | Invoke-Expression
+    irm https://christitus.com/win | iex
 }
 #endregion Other Utilities
 
@@ -604,7 +759,7 @@ function Get-Theme {
                 }
             }
             else {
-                oh-my-posh init pwsh --config https://raw.githubusercontent.com/66Bunz/powershell-profile/main/bunz-theme.omp.json | Invoke-Expression
+                oh-my-posh init pwsh --config $repo_root/powershell-profile/main/bunz-theme.omp.json | Invoke-Expression
             }
         }
     }
@@ -616,7 +771,7 @@ function Get-Theme {
             }
         }
         else {
-            oh-my-posh init pwsh --config https://raw.githubusercontent.com/66Bunz/powershell-profile/main/bunz-theme.omp.json | Invoke-Expression
+            oh-my-posh init pwsh --config $repo_root/powershell-profile/main/bunz-theme.omp.json | Invoke-Expression
         }
     }
 }
