@@ -579,7 +579,7 @@ function which($name) {
 function py-env {
     param (
         [Parameter(Mandatory = $true)]
-        [ValidateSet("create", "activate", "deactivate", "delete")]
+        [ValidateSet("create", "activate", "deactivate", "delete", "freeze")]
         [string]$Command
     )
 
@@ -610,6 +610,16 @@ function py-env {
             }
             else {
                 Write-Host "No virtual environment found to delete." -ForegroundColor Red
+            }
+        }
+        "freeze" {
+            if (Test-Path ".\.venv\Scripts\Activate") {
+                Write-Host "Freezing Python virtual environment dependencies..." -ForegroundColor Yellow
+                & .\.venv\Scripts\pip.exe freeze > requirements.txt
+                Write-Host "Dependencies frozen to requirements.txt!" -ForegroundColor Green
+            }
+            else {
+                Write-Host "Error: Virtual environment not found. Run 'py-env create' first." -ForegroundColor Red
             }
         }
     }
